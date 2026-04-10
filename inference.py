@@ -13,7 +13,7 @@ Log format (stdout):
 
 Run:
   export HF_TOKEN=hf_...
-  export SERVER_URL=http://localhost:8000
+  export SERVER_URL=http://localhost:7860
   python inference.py
 """
 
@@ -32,7 +32,7 @@ API_BASE_URL: str = os.getenv("API_BASE_URL", "https://router.huggingface.co/v1"
 MODEL_NAME: str = os.getenv("MODEL_NAME", "Qwen/Qwen2.5-72B-Instruct")
 HF_TOKEN: Optional[str] = os.getenv("HF_TOKEN")
 
-SERVER_URL: str = os.getenv("SERVER_URL", "http://localhost:8000")
+SERVER_URL: str = os.getenv("SERVER_URL", "http://localhost:7860")
 
 TASKS = ["task_easy", "task_medium", "task_hard"]
 MAX_STEPS = 3
