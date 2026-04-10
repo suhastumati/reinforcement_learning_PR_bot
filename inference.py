@@ -34,7 +34,7 @@ HF_TOKEN: Optional[str] = os.getenv("HF_TOKEN")
 
 SERVER_URL: str = os.getenv("SERVER_URL", "http://localhost:7860")
 
-TASKS = ["task_easy", "task_medium", "task_hard"]
+TASKS = ["task_easy", "task_medium", "task_hard", "task_idor", "task_path_traversal"]
 MAX_STEPS = 3
 MAX_TOKENS = 1024
 SUCCESS_SCORE_THRESHOLD = 0.7
@@ -176,6 +176,8 @@ def run_task(client: OpenAI, task_id: str) -> Dict[str, Any]:
     success = False
     last_error: Optional[str] = None
 
+    log_start(task=task_id, env=BENCHMARK, model=MODEL_NAME)
+
     try:
         result = env_reset(task_id)
         obs = result.get("observation", {})
@@ -239,8 +241,6 @@ def main() -> None:
         sys.exit(1)
 
     client = OpenAI(base_url=API_BASE_URL, api_key=HF_TOKEN)
-
-    log_start(task=",".join(TASKS), env=BENCHMARK, model=MODEL_NAME)
 
     all_results = []
     for task_id in TASKS:

@@ -61,6 +61,16 @@ _sessions: dict = {}
 
 # ── Health / Info ─────────────────────────────────────────────────────────────
 
+@app.get("/")
+def root():
+    return {
+        "name": "code-review-triage",
+        "version": "1.0.0",
+        "status": "running",
+        "endpoints": ["/health", "/metadata", "/schema", "/tasks", "/reset", "/step", "/state", "/ws"],
+    }
+
+
 @app.get("/health")
 def health():
     return {"status": "healthy"}
@@ -149,7 +159,7 @@ async def grade(request: Request):
     if task_id not in TASKS:
         return JSONResponse({"error": f"Unknown task_id '{task_id}'"}, status_code=404)
     score, feedback = grade_action(action, TASKS[task_id])
-    return {"task_id": task_id, "score": score, "feedback": feedback, "score_range": [0.0, 1.0]}
+    return {"task_id": task_id, "score": score, "reward": score, "feedback": feedback, "score_range": [0.0, 1.0]}
 
 
 @app.post("/tasks/{task_id}/grade")
@@ -162,7 +172,7 @@ async def grade_task(task_id: str, request: Request):
         body = {}
     action = body.get("action", {})
     score, feedback = grade_action(action, TASKS[task_id])
-    return {"task_id": task_id, "score": score, "feedback": feedback, "score_range": [0.0, 1.0]}
+    return {"task_id": task_id, "score": score, "reward": score, "feedback": feedback, "score_range": [0.0, 1.0]}
 
 
 # ── HTTP simulation endpoints ─────────────────────────────────────────────────
