@@ -25,6 +25,11 @@ try:
 except ModuleNotFoundError:
     from server.environment import CodeReviewEnvironment, TASKS, TASK_ORDER
 
+try:
+    from models import CodeReviewAction, CodeReviewObservation, CodeReviewState
+except ModuleNotFoundError:
+    from models import CodeReviewAction, CodeReviewObservation, CodeReviewState
+
 app = FastAPI(
     title="Code Review Triage Environment",
     description=(
@@ -52,6 +57,44 @@ _sessions: dict = {}
 @app.get("/health")
 def health():
     return {"status": "healthy", "environment": "code-review-triage"}
+
+
+@app.get("/metadata")
+def metadata():
+    return {
+        "name": "code-review-triage",
+        "description": (
+            "An RL environment where an agent learns to triage pull request diffs: "
+            "detect bugs, security vulnerabilities, and architectural problems, "
+            "producing structured reviews with severity labels and inline comments."
+        ),
+        "version": "1.0.0",
+        "author": "Suhas Pranay",
+        "tags": ["openenv", "code-review", "security", "nlp", "real-world"],
+    }
+
+
+@app.get("/schema")
+def schema():
+    return {
+        "action": CodeReviewAction.model_json_schema(),
+        "observation": CodeReviewObservation.model_json_schema(),
+        "state": CodeReviewState.model_json_schema(),
+    }
+
+
+@app.post("/mcp")
+async def mcp(request: dict = None):
+    request = request or {}
+    return {
+        "jsonrpc": "2.0",
+        "id": request.get("id", 1),
+        "result": {
+            "name": "code-review-triage",
+            "version": "1.0.0",
+            "capabilities": ["reset", "step", "state"],
+        },
+    }
 
 
 @app.get("/tasks")
