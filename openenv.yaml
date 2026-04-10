@@ -1,0 +1,26 @@
+name: code-review-triage
+version: "1.0.0"
+license: "MIT"
+description: >
+  An RL environment where an agent learns to triage pull request diffs.
+  The agent must identify bugs, security vulnerabilities, and architectural
+  problems — and produce structured reviews with severity labels and inline comments.
+tags:
+  - openenv
+  - code-review
+  - security
+  - nlp
+  - real-world
+author: "Suhas Pranay"
+tasks:
+  - id: task_easy
+    description: "Detect a null-pointer dereference bug in a Python greeting function"
+    difficulty: easy
+  - id: task_medium
+    description: "Identify SQL injection vulnerabilities in a Flask search endpoint"
+    difficulty: medium
+  - id: task_hard
+    description: "Evaluate an async batch notifier with N+1 queries, race condition, and missing error handling"
+    difficulty: hard
+entrypoint: server/app.py
+port: 8000

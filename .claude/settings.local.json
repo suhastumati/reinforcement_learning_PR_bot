@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "WebSearch",
+      "Bash(python3 -m uvicorn server.app:app --host 0.0.0.0 --port 8765)",
+      "Bash(curl -s http://localhost:8765/health)",
+      "Bash(curl -s -X POST http://localhost:8765/reset -H \"Content-Type: application/json\" -d '{\"task_id\":\"task_easy\"}')",
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\('reset ok, task:', d['observation']['task_id']\\)\")",
+      "Bash(curl -s -X POST http://localhost:8765/step -H \"Content-Type: application/json\" -d '{\"task_id\":\"task_easy\",\"action\":{\"severity\":\"critical\",\"inline_comments\":[{\"line_number\":4,\"comment\":\"None dereference\"}],\"summary\":\"null bug\",\"approve\":false}}')",
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\('step reward:', d['reward'], 'done:', d['done']\\)\")",
+      "Bash(curl -s \"http://localhost:8765/tasks\")",
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); [print\\(' -', t['task_id'], t['difficulty']\\) for t in d['tasks']]\" kill %1)",
+      "Bash(docker build:*)"
+    ]
+  }
+}

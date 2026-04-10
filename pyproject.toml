@@ -1,0 +1,35 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.backends.legacy:build"
+
+[project]
+name = "code-review-triage"
+version = "1.0.0"
+description = "An RL environment where an agent learns to triage pull request diffs: detect bugs, security vulnerabilities, and architectural problems."
+license = { text = "MIT" }
+authors = [
+    { name = "Suhas Pranay", email = "suhaspranay302002@gmail.com" }
+]
+requires-python = ">=3.10"
+dependencies = [
+    "fastapi>=0.115.5",
+    "uvicorn[standard]>=0.32.1",
+    "pydantic>=2.10.3",
+    "websockets>=15.0.1",
+    "requests>=2.32.3",
+    "openai>=2.7.2",
+    "openenv-core>=0.2.0",
+]
+
+[project.optional-dependencies]
+dev = []
+
+[project.scripts]
+server = "server.app:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["server*"]
+
+[project.urls]
+Homepage = "https://huggingface.co/spaces/suhas/code-review-triage"
