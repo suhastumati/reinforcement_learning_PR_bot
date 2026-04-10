@@ -21,9 +21,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import ValidationError
 
 try:
-    from environment import CodeReviewEnvironment, TASKS, TASK_ORDER
+    from environment import CodeReviewEnvironment, TASKS, TASK_ORDER, grade_action
 except ModuleNotFoundError:
-    from server.environment import CodeReviewEnvironment, TASKS, TASK_ORDER
+    from server.environment import CodeReviewEnvironment, TASKS, TASK_ORDER, grade_action
 
 try:
     from models import CodeReviewAction, CodeReviewObservation, CodeReviewState
@@ -105,9 +105,28 @@ def list_tasks():
                 "task_id": tid,
                 "difficulty": TASKS[tid]["difficulty"],
                 "pr_title": TASKS[tid]["pr_title"],
+                "has_grader": True,
+                "score_range": [0.0, 1.0],
+                "grader": "grade_action",
             }
             for tid in TASK_ORDER
         ]
+    }
+
+
+@app.post("/grade")
+def grade(body: dict):
+    """Directly grade an action against a task without running a full episode."""
+    task_id = body.get("task_id", "task_easy")
+    action = body.get("action", {})
+    if task_id not in TASKS:
+        return {"error": f"Unknown task_id '{task_id}'. Valid: {TASK_ORDER}"}
+    score, feedback = grade_action(action, TASKS[task_id])
+    return {
+        "task_id": task_id,
+        "score": score,
+        "feedback": feedback,
+        "score_range": [0.0, 1.0],
     }
 
 
