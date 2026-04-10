@@ -1,39 +1,32 @@
 """
 Code Review Triage Environment — Typed Models
 
-Action:   The agent's review decision (severity label + inline comments + approve/reject)
+Action:      The agent's review decision (severity + inline comments + approve/reject)
 Observation: The PR diff + file context the agent sees
-State:    Episode metadata (task_id, step_count, etc.)
+State:       Episode metadata (task_id, step_count, etc.)
 """
 
-from typing import List, Optional
-from pydantic import BaseModel, Field
+from typing import Dict, Any, List, Optional
+from pydantic import Field
+
+from openenv.core.env_server.types import (
+    Action as BaseAction,
+    Observation as BaseObservation,
+    State as BaseState,
+)
 
 
-# ─── Base classes (mirrors openenv-core interface) ────────────────────────────
-
-class Action(BaseModel):
-    pass
-
-class Observation(BaseModel):
-    done: bool = False
-    reward: Optional[float] = None
-
-class State(BaseModel):
-    episode_id: Optional[str] = None
-    step_count: int = 0
-
-
-# ─── Domain models ────────────────────────────────────────────────────────────
-
-class InlineComment(BaseModel):
+class InlineComment(BaseAction):
     """A comment attached to a specific line in the diff."""
+    model_config = {"extra": "allow"}
     line_number: int = Field(..., description="Line number in the diff (1-indexed)")
     comment: str = Field(..., description="The review comment text")
 
 
-class CodeReviewAction(Action):
+class CodeReviewAction(BaseAction):
     """What the agent produces after reviewing a PR diff."""
+    model_config = {"extra": "allow"}
+
     severity: str = Field(
         ...,
         description=(
@@ -44,7 +37,7 @@ class CodeReviewAction(Action):
             "'approved' (looks good)"
         ),
     )
-    inline_comments: List[InlineComment] = Field(
+    inline_comments: List[Dict[str, Any]] = Field(
         default_factory=list,
         description="Inline review comments attached to specific diff lines",
     )
@@ -58,8 +51,10 @@ class CodeReviewAction(Action):
     )
 
 
-class CodeReviewObservation(Observation):
+class CodeReviewObservation(BaseObservation):
     """What the agent sees: the PR diff and context."""
+    model_config = {"extra": "allow"}
+
     task_id: str = Field(..., description="Unique identifier for this task scenario")
     task_difficulty: str = Field(..., description="'easy', 'medium', or 'hard'")
     pr_title: str = Field(..., description="Title of the pull request")
@@ -79,16 +74,16 @@ class CodeReviewObservation(Observation):
     )
     legal_actions: List[str] = Field(
         default_factory=lambda: ["critical", "major", "minor", "approved"],
-        description=(
-            "Valid severity labels at this step. "
-            "Always the full set; included to match OpenEnv convention."
-        ),
+        description="Valid severity labels at this step.",
     )
 
 
-class CodeReviewState(State):
+class CodeReviewState(BaseState):
     """Episode-level metadata."""
+    model_config = {"extra": "allow"}
+
     task_id: str = ""
     task_difficulty: str = ""
     max_steps: int = 3
     attempts_used: int = 0
+    best_score: float = 0.0

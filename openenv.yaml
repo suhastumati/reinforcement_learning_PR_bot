@@ -18,18 +18,30 @@ tasks:
     difficulty: easy
     grader: true
     score_range: [0.0, 1.0]
-    grader_endpoint: "/grade"
+    grader_endpoint: "/tasks/task_easy/grade"
   - id: task_medium
     description: "Identify SQL injection vulnerabilities in a Flask search endpoint"
     difficulty: medium
     grader: true
     score_range: [0.0, 1.0]
-    grader_endpoint: "/grade"
+    grader_endpoint: "/tasks/task_medium/grade"
   - id: task_hard
     description: "Evaluate an async batch notifier with N+1 queries, race condition, and missing error handling"
     difficulty: hard
     grader: true
     score_range: [0.0, 1.0]
-    grader_endpoint: "/grade"
+    grader_endpoint: "/tasks/task_hard/grade"
+  - id: task_idor
+    description: "Detect insecure direct object reference (IDOR) and SQL injection in a document download endpoint"
+    difficulty: medium
+    grader: true
+    score_range: [0.0, 1.0]
+    grader_endpoint: "/tasks/task_idor/grade"
+  - id: task_path_traversal
+    description: "Identify path traversal vulnerability and missing authentication in file upload/preview endpoints"
+    difficulty: hard
+    grader: true
+    score_range: [0.0, 1.0]
+    grader_endpoint: "/tasks/task_path_traversal/grade"
 entrypoint: server/app.py
 port: 7860
