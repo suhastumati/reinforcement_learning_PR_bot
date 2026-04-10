@@ -419,7 +419,8 @@ class CodeReviewEnvironment:
                 self._hit_lines,
                 self._step_count,
             )
-            reward = step_reward
+            # Clamp to [0.0, 1.0] so evaluators always see a valid reward range
+            reward = round(max(0.0, min(1.0, step_reward)), 4)
             feedback = dense_feedback
 
         self._last_feedback = feedback

@@ -130,6 +130,38 @@ def grade(body: dict):
     }
 
 
+@app.post("/tasks/{task_id}/grade")
+def grade_task(task_id: str, body: dict = None):
+    """Grade an action for a specific task (alternative path)."""
+    body = body or {}
+    action = body.get("action", {})
+    if task_id not in TASKS:
+        return {"error": f"Unknown task_id '{task_id}'. Valid: {TASK_ORDER}"}
+    score, feedback = grade_action(action, TASKS[task_id])
+    return {
+        "task_id": task_id,
+        "score": score,
+        "feedback": feedback,
+        "score_range": [0.0, 1.0],
+    }
+
+
+@app.get("/tasks/{task_id}")
+def get_task(task_id: str):
+    """Get details for a specific task including grader info."""
+    if task_id not in TASKS:
+        return {"error": f"Unknown task_id '{task_id}'. Valid: {TASK_ORDER}"}
+    task = TASKS[task_id]
+    return {
+        "task_id": task_id,
+        "difficulty": task["difficulty"],
+        "pr_title": task["pr_title"],
+        "grader": True,
+        "score_range": [0.0, 1.0],
+        "grader_endpoint": f"/tasks/{task_id}/grade",
+    }
+
+
 @app.post("/reset")
 def reset(body: dict = None):
     body = body or {}
