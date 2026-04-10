@@ -1,3 +1,17 @@
+---
+title: Code Review Triage
+emoji: 🔍
+colorFrom: blue
+colorTo: green
+sdk: docker
+pinned: false
+tags:
+  - openenv
+  - code-review
+  - reinforcement-learning
+  - real-world
+---
+
 # Code Review Triage — OpenEnv Environment
 
 An RL environment where an AI agent learns to **triage pull request diffs**: detect bugs, security vulnerabilities, and architectural problems — and produce structured code reviews with severity labels and inline comments.
