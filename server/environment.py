@@ -1,27 +1,9 @@
 """
-Code Review Triage — Server-side Environment Logic
-
-Five tasks with graders:
-  Task 1 (easy):   Detect an obvious null-pointer dereference bug
-  Task 2 (medium): Identify a SQL injection security vulnerability
-  Task 3 (hard):   Evaluate a poorly architected async function with multiple issues
-                   (race condition + missing error handling + inefficient N+1 query)
-  Task 4 (medium): Detect insecure direct object reference (IDOR) vulnerability
-  Task 5 (hard):   Identify a path traversal vulnerability and missing auth
+Code Review Triage — Environment Logic (no openenv-core dependency)
 """
 
 import uuid
 from typing import Any, Dict, List, Optional, Set, Tuple
-
-from openenv.core.env_server.interfaces import Environment
-from openenv.core.env_server.types import EnvironmentMetadata
-
-try:
-    from models import CodeReviewAction, CodeReviewObservation, CodeReviewState
-except ModuleNotFoundError:
-    from models import CodeReviewAction, CodeReviewObservation, CodeReviewState
-
-# ─── Task definitions ─────────────────────────────────────────────────────────
 
 TASKS: Dict[str, Dict[str, Any]] = {
     "task_easy": {
@@ -261,8 +243,6 @@ TASKS: Dict[str, Dict[str, Any]] = {
 TASK_ORDER = ["task_easy", "task_medium", "task_hard", "task_idor", "task_path_traversal"]
 
 
-# ─── Grader ───────────────────────────────────────────────────────────────────
-
 def _keywords_hit(text: str, keyword_groups: list) -> float:
     text_lower = text.lower()
     hits = sum(
@@ -273,17 +253,6 @@ def _keywords_hit(text: str, keyword_groups: list) -> float:
 
 
 def grade_action(action_dict: Dict[str, Any], task: Dict[str, Any]) -> Tuple[float, str]:
-    """
-    Grade a CodeReviewAction against ground truth.
-
-    Returns (score: float 0.0–1.0, feedback: str)
-
-    Scoring breakdown:
-      30%  Severity label correct
-      20%  Approve/reject decision correct
-      30%  Key issues mentioned in summary + comments (partial credit)
-      20%  Inline comment(s) on the right line(s)
-    """
     severity_score = 0.0
     approve_score = 0.0
     issue_score = 0.0
@@ -298,7 +267,6 @@ def grade_action(action_dict: Dict[str, Any], task: Dict[str, Any]) -> Tuple[flo
         c.get("comment", "") for c in inline_comments
     )
 
-    # 1. Severity (30%)
     if severity == task["expected_severity"]:
         severity_score = 1.0
         feedback_parts.append("Severity label correct.")
@@ -308,7 +276,6 @@ def grade_action(action_dict: Dict[str, Any], task: Dict[str, Any]) -> Tuple[flo
     else:
         feedback_parts.append(f"Wrong severity — expected '{task['expected_severity']}', got '{severity}'.")
 
-    # 2. Approve/reject (20%)
     if approve == task["expected_approve"]:
         approve_score = 1.0
         feedback_parts.append("Approve decision correct.")
@@ -316,19 +283,14 @@ def grade_action(action_dict: Dict[str, Any], task: Dict[str, Any]) -> Tuple[flo
         decision = "approve" if task["expected_approve"] else "request changes"
         feedback_parts.append(f"Wrong decision — should {decision}.")
 
-    # 3. Key issues detected (30%) — partial credit
     issue_score = _keywords_hit(all_comment_text, task["key_issues"])
-    pct = int(issue_score * 100)
-    feedback_parts.append(f"Key issues detected: {pct}%.")
+    feedback_parts.append(f"Key issues detected: {int(issue_score * 100)}%.")
 
-    # 4. Inline comment line coverage (20%)
     expected_lines = set(task["expected_comment_lines"])
     commented_lines = set(c.get("line_number", -1) for c in inline_comments)
     if expected_lines:
         line_score = len(expected_lines & commented_lines) / len(expected_lines)
-    feedback_parts.append(
-        f"Line coverage: {int(line_score * 100)}% of key lines commented."
-    )
+    feedback_parts.append(f"Line coverage: {int(line_score * 100)}% of key lines commented.")
 
     total = (
         0.30 * severity_score
@@ -337,7 +299,6 @@ def grade_action(action_dict: Dict[str, Any], task: Dict[str, Any]) -> Tuple[flo
         + 0.20 * line_score
     )
 
-    # Exploit guard: penalise approving a PR with a critical/major bug
     if approve and task["expected_severity"] in ("critical", "major"):
         total -= 0.20
         feedback_parts.append("Penalty: approved a PR with critical/major issues.")
@@ -345,8 +306,6 @@ def grade_action(action_dict: Dict[str, Any], task: Dict[str, Any]) -> Tuple[flo
     total = round(max(0.0, min(1.0, total)), 4)
     return total, " | ".join(feedback_parts)
 
-
-# ─── Dense per-step reward breakdown ─────────────────────────────────────────
 
 def _dense_reward(
     action_dict: Dict[str, Any],
@@ -382,8 +341,7 @@ def _dense_reward(
     for group in task["key_issues"]:
         synonyms = group if isinstance(group, list) else [group]
         group_key = synonyms[0]
-        matched = any(kw in all_text for kw in synonyms)
-        if matched and group_key not in already_found_issues:
+        if any(kw in all_text for kw in synonyms) and group_key not in already_found_issues:
             step_reward += 0.04
             already_found_issues = already_found_issues | {group_key}
             feedback_parts.append(f"+0.04 new issue found: '{group_key}'.")
@@ -407,59 +365,29 @@ def _dense_reward(
 
     step_reward -= 0.005
     step_reward = round(max(-1.0, step_reward), 4)
-
     feedback = " | ".join(feedback_parts) if feedback_parts else "No new discoveries."
     return step_reward, already_found_issues, already_hit_lines, feedback
 
 
-# ─── Environment class ────────────────────────────────────────────────────────
-
-class CodeReviewEnvironment(Environment[CodeReviewAction, CodeReviewObservation, CodeReviewState]):
-    """
-    OpenEnv-compatible environment for code review triage.
-
-    Each episode = one task scenario.
-    The agent gets up to MAX_STEPS attempts to review the same diff.
-    """
-
+class CodeReviewEnvironment:
     SUPPORTS_CONCURRENT_SESSIONS = True
     MAX_STEPS = 3
 
     def __init__(self):
-        super().__init__()
-        self._task_id: str = "task_easy"
-        self._task: Dict[str, Any] = TASKS["task_easy"]
-        self._episode_id: str = ""
-        self._step_count: int = 0
-        self._best_score: float = 0.0
-        self._last_feedback: str = ""
+        self._task_id = "task_easy"
+        self._task = TASKS["task_easy"]
+        self._episode_id = ""
+        self._step_count = 0
+        self._best_score = 0.0
+        self._last_feedback = ""
         self._found_issues: Set[str] = set()
         self._hit_lines: Set[int] = set()
 
-    def get_metadata(self) -> EnvironmentMetadata:
-        return EnvironmentMetadata(
-            name="code-review-triage",
-            description=(
-                "An RL environment where an agent learns to triage pull request diffs: "
-                "detect bugs, security vulnerabilities, and architectural problems, "
-                "producing structured reviews with severity labels and inline comments."
-            ),
-            version="1.0.0",
-            author="Suhas Pranay",
-        )
-
-    def reset(
-        self,
-        task_id: Optional[str] = None,
-        seed: Optional[int] = None,
-        episode_id: Optional[str] = None,
-        **kwargs,
-    ) -> CodeReviewObservation:
+    def reset(self, task_id=None, seed=None, episode_id=None, **kwargs) -> Dict[str, Any]:
         if task_id and task_id in TASKS:
             self._task_id = task_id
         else:
             self._task_id = "task_easy"
-
         self._task = TASKS[self._task_id]
         self._episode_id = episode_id or str(uuid.uuid4())
         self._step_count = 0
@@ -467,26 +395,12 @@ class CodeReviewEnvironment(Environment[CodeReviewAction, CodeReviewObservation,
         self._last_feedback = ""
         self._found_issues = set()
         self._hit_lines = set()
-
         return self._build_obs(done=False, reward=None, feedback="")
 
-    def step(
-        self,
-        action: CodeReviewAction,
-        timeout_s: Optional[float] = None,
-        **kwargs,
-    ) -> CodeReviewObservation:
+    def step(self, action_dict: Dict[str, Any], **kwargs) -> Dict[str, Any]:
         self._step_count += 1
-
-        # Accept both Pydantic model and plain dict
-        if hasattr(action, "model_dump"):
-            action_dict = action.model_dump()
-        else:
-            action_dict = dict(action)
-
         final_score, grade_feedback = grade_action(action_dict, self._task)
         self._best_score = max(self._best_score, final_score)
-
         done = (final_score >= 0.85) or (self._step_count >= self.MAX_STEPS)
 
         if done:
@@ -494,11 +408,7 @@ class CodeReviewEnvironment(Environment[CodeReviewAction, CodeReviewObservation,
             feedback = grade_feedback
         else:
             step_reward, self._found_issues, self._hit_lines, dense_feedback = _dense_reward(
-                action_dict,
-                self._task,
-                self._found_issues,
-                self._hit_lines,
-                self._step_count,
+                action_dict, self._task, self._found_issues, self._hit_lines, self._step_count,
             )
             reward = round(max(0.0, min(1.0, step_reward)), 4)
             feedback = dense_feedback
@@ -506,32 +416,31 @@ class CodeReviewEnvironment(Environment[CodeReviewAction, CodeReviewObservation,
         self._last_feedback = feedback
         return self._build_obs(done=done, reward=reward, feedback=feedback)
 
-    @property
-    def state(self) -> CodeReviewState:
-        return CodeReviewState(
-            episode_id=self._episode_id,
-            step_count=self._step_count,
-            task_id=self._task_id,
-            task_difficulty=self._task["difficulty"],
-            max_steps=self.MAX_STEPS,
-            attempts_used=self._step_count,
-            best_score=self._best_score,
-        )
+    def get_state(self) -> Dict[str, Any]:
+        return {
+            "episode_id": self._episode_id,
+            "step_count": self._step_count,
+            "task_id": self._task_id,
+            "task_difficulty": self._task["difficulty"],
+            "max_steps": self.MAX_STEPS,
+            "attempts_used": self._step_count,
+            "best_score": self._best_score,
+        }
 
-    def _build_obs(
-        self, done: bool, reward: Optional[float], feedback: str
-    ) -> CodeReviewObservation:
+    def _build_obs(self, done: bool, reward, feedback: str) -> Dict[str, Any]:
         task = self._task
-        return CodeReviewObservation(
-            task_id=self._task_id,
-            task_difficulty=task["difficulty"],
-            pr_title=task["pr_title"],
-            pr_description=task["pr_description"],
-            diff=task["diff"],
-            file_context=task.get("file_context", ""),
-            feedback=feedback,
-            current_score=self._best_score,
-            legal_actions=["critical", "major", "minor", "approved"],
-            done=done,
-            reward=reward,
-        )
+        return {
+            "observation": {
+                "task_id": self._task_id,
+                "task_difficulty": task["difficulty"],
+                "pr_title": task["pr_title"],
+                "pr_description": task["pr_description"],
+                "diff": task["diff"],
+                "file_context": task.get("file_context", ""),
+                "feedback": feedback,
+                "current_score": self._best_score,
+                "legal_actions": ["critical", "major", "minor", "approved"],
+            },
+            "done": done,
+            "reward": reward,
+        }
